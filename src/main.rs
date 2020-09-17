@@ -7,6 +7,8 @@ extern crate ggez;
 extern crate rand;
 
 use ggez::{graphics, event, conf, nalgebra::Point2, Context, ContextBuilder, GameResult};
+use ggez::graphics::{MeshBuilder, DrawParam, DrawMode, Text};
+use ggez::event::{KeyCode, KeyMods, EventsLoop};
 use rand::Rng;
 
 struct Object {
@@ -20,7 +22,7 @@ struct Player {
 }
 
 struct Game {
-    window_size: Point2<f32>,
+    WINDOW_SIZE: Point2<f32>,
     paddle_size: Point2<f32>,
     line_width: f32,
     ball: Object,
@@ -35,7 +37,7 @@ impl Game {
         let line_width = x * 0.01; 
 
         return Game {
-            window_size: Point2::new(x, y),
+            WINDOW_SIZE: Point2::new(x, y),
             paddle_size: paddle_size,
             line_width: line_width,
 
@@ -63,7 +65,7 @@ impl Game {
         };
     }
 
-    pub fn start(&mut self, context: &mut Context, events_loop: &mut event::EventsLoop) {
+    pub fn start(&mut self, context: &mut Context, events_loop: &mut EventsLoop) {
         if (self.random(1, 3) == 1) {
             self.create_ball(false, context);
         } else {
@@ -79,7 +81,7 @@ impl Game {
     fn create_ball(&mut self, right_side: bool, context: &mut Context) {
         let (mut horizontal, mut vertical) = (self.random(3.0, 6.0), self.random(2.0, 4.0));
         
-        self.ball.position = Point2::new(self.window_size.x / 2.0, self.window_size.y / 2.0);
+        self.ball.position = Point2::new(self.WINDOW_SIZE.x / 2.0, self.WINDOW_SIZE.y / 2.0);
         
         if (right_side) {
             horizontal = -horizontal;
@@ -112,45 +114,48 @@ impl event::EventHandler for Game {
     fn draw(&mut self, context: &mut Context) -> GameResult<()> {
         graphics::clear(context, graphics::BLACK);
 
+        let DEFAULT_PARAMS = DrawParam::default();
+        let FILL_MODE = DrawMode::fill();
+
         let LINE_COLOR = graphics::WHITE;
         let PADDLE_COLOR = graphics::Color::new(0.0, 255.0, 0.0, 1.0);
 
-        let BALL_RADIUS = self.window_size.x * 0.025;
+        let BALL_RADIUS = self.WINDOW_SIZE.x * 0.025;
 
-        let MIDDLE_X = (self.window_size.x / 2.0) - self.line_width;
-        let END_X = self.window_size.x - self.line_width * 2.0;
+        let MIDDLE_X = (self.WINDOW_SIZE.x / 2.0) - self.line_width;
+        let END_X = self.WINDOW_SIZE.x - self.line_width * 2.0;
 
-        let backgroundMesh = graphics::MeshBuilder::new()
-            .line(&[ Point2::new(MIDDLE_X, 0.0), Point2::new(MIDDLE_X, self.window_size.y) ], self.line_width, LINE_COLOR)? // Middle
-            .line(&[ Point2::new(0.0, 0.0), Point2::new(0.0, self.window_size.y) ], self.line_width, LINE_COLOR)? // Left
-            .line(&[ Point2::new(END_X, 0.0), Point2::new(END_X, self.window_size.y) ], self.line_width, LINE_COLOR)? // Right
-            .circle(graphics::DrawMode::fill(), Point2::new(self.window_size.x / 2.0 - self.line_width, self.window_size.y / 2.0), self.window_size.x * 0.05, 0.05, LINE_COLOR) // Middle circle
+        let backgroundMesh = MeshBuilder::new()
+            .line(&[ Point2::new(MIDDLE_X, 0.0), Point2::new(MIDDLE_X, self.WINDOW_SIZE.y) ], self.line_width, LINE_COLOR)? // Middle
+            .line(&[ Point2::new(0.0, 0.0), Point2::new(0.0, self.WINDOW_SIZE.y) ], self.line_width, LINE_COLOR)? // Left
+            .line(&[ Point2::new(END_X, 0.0), Point2::new(END_X, self.WINDOW_SIZE.y) ], self.line_width, LINE_COLOR)? // Right
+            .circle(FILL_MODE, Point2::new(self.WINDOW_SIZE.x / 2.0 - self.line_width, self.WINDOW_SIZE.y / 2.0), self.WINDOW_SIZE.x * 0.05, 0.05, LINE_COLOR) // Middle circle
             .build(context)?;
 
-        graphics::draw(context, &backgroundMesh, graphics::DrawParam::default())?;
+        graphics::draw(context, &backgroundMesh, DEFAULT_PARAMS)?;
 
         let (paddle1new, paddle2new) = (self.p1.paddle.position.y + self.p1.paddle.velocity.y, self.p2.paddle.position.y + self.p2.paddle.velocity.y);
 
-        if (paddle1new > 0.0 && self.window_size.y > (paddle1new + self.paddle_size.y)) {
+        if (paddle1new > 0.0 && self.WINDOW_SIZE.y > (paddle1new + self.paddle_size.y)) {
             self.p1.paddle.position = self.add_points(self.p1.paddle.position, self.p1.paddle.velocity);
         }
 
-        if (paddle2new > 0.0 && self.window_size.y > (paddle2new + self.paddle_size.y)) {
+        if (paddle2new > 0.0 && self.WINDOW_SIZE.y > (paddle2new + self.paddle_size.y)) {
             self.p2.paddle.position = self.add_points(self.p2.paddle.position, self.p2.paddle.velocity);
         }
 
         self.ball.position = self.add_points(self.ball.position, self.ball.velocity);
 
-        let mainMesh = graphics::MeshBuilder::new()
-            .circle(graphics::DrawMode::fill(), self.ball.position, BALL_RADIUS, 0.05, graphics::Color::new(255.0, 0.0, 0.0, 1.0)) // Ball
-            .rectangle(graphics::DrawMode::fill(), graphics::Rect::new(self.p1.paddle.position.x, self.p1.paddle.position.y, self.paddle_size.x, self.paddle_size.y), PADDLE_COLOR) // p1 paddle
-            .rectangle(graphics::DrawMode::fill(), graphics::Rect::new(self.p2.paddle.position.x, self.p2.paddle.position.y, self.paddle_size.x, self.paddle_size.y), PADDLE_COLOR) // p2 paddle
+        let mainMesh = MeshBuilder::new()
+            .circle(FILL_MODE, self.ball.position, BALL_RADIUS, 0.05, graphics::Color::new(255.0, 0.0, 0.0, 1.0)) // Ball
+            .rectangle(FILL_MODE, graphics::Rect::new(self.p1.paddle.position.x, self.p1.paddle.position.y, self.paddle_size.x, self.paddle_size.y), PADDLE_COLOR) // p1 paddle
+            .rectangle(FILL_MODE, graphics::Rect::new(self.p2.paddle.position.x, self.p2.paddle.position.y, self.paddle_size.x, self.paddle_size.y), PADDLE_COLOR) // p2 paddle
             .build(context)?;
 
-        graphics::draw(context, &mainMesh, graphics::DrawParam::default())?;
+        graphics::draw(context, &mainMesh, DEFAULT_PARAMS)?;
 
         // Top/bottom wall collision
-        if (BALL_RADIUS >= self.ball.position.y || (self.ball.position.y + BALL_RADIUS) >= self.window_size.y) {
+        if (BALL_RADIUS >= self.ball.position.y || (self.ball.position.y + BALL_RADIUS) >= self.WINDOW_SIZE.y) {
             self.ball.velocity.y = -self.ball.velocity.y;
         }
 
@@ -178,35 +183,35 @@ impl event::EventHandler for Game {
             }
         }
 
-        let score1 = graphics::Text::new(format!("Score: {}", self.p1.score));
-        let score2 = graphics::Text::new(format!("Score: {}", self.p2.score));
+        let score1 = Text::new(format!("Score: {}", self.p1.score));
+        let score2 = Text::new(format!("Score: {}", self.p2.score));
 
-        graphics::draw(context, &score1, graphics::DrawParam::default().dest(Point2::new(self.window_size.x * 0.1, self.window_size.y * 0.1)))?;
-        graphics::draw(context, &score2, graphics::DrawParam::default().dest(Point2::new(self.window_size.x * 0.8, self.window_size.y * 0.1)))?;
+        graphics::draw(context, &score1, DrawParam::default().dest(Point2::new(self.WINDOW_SIZE.x * 0.1, self.WINDOW_SIZE.y * 0.1)))?;
+        graphics::draw(context, &score2, DrawParam::default().dest(Point2::new(self.WINDOW_SIZE.x * 0.8, self.WINDOW_SIZE.y * 0.1)))?;
 
         return graphics::present(context);
     }
 
-    fn key_down_event(&mut self, context: &mut Context, keycode: event::KeyCode, mods: event::KeyMods, repeat: bool) {
-        if (keycode == event::KeyCode::W) {
+    fn key_down_event(&mut self, context: &mut Context, keycode: event::KeyCode, mods: KeyMods, repeat: bool) {
+        if (keycode == KeyCode::W) {
             self.p1.paddle.velocity.y = -8.0;
 
-        } else if (keycode == event::KeyCode::S) {
+        } else if (keycode == KeyCode::S) {
             self.p1.paddle.velocity.y = 8.0;
 
-        } else if (keycode == event::KeyCode::Up) {
+        } else if (keycode == KeyCode::Up) {
             self.p2.paddle.velocity.y = -8.0;
 
-        } else if (keycode == event::KeyCode::Down) {
+        } else if (keycode == KeyCode::Down) {
             self.p2.paddle.velocity.y = 8.0;
         }
     }
 
-    fn key_up_event(&mut self, context: &mut Context, keycode: event::KeyCode, mods: event::KeyMods) {
-        if (keycode == event::KeyCode::W || keycode == event::KeyCode::S) {
+    fn key_up_event(&mut self, context: &mut Context, keycode: KeyCode, mods: KeyMods) {
+        if (keycode == KeyCode::W || keycode == KeyCode::S) {
             self.p1.paddle.velocity.y = 0.0;
 
-        } else if (keycode == event::KeyCode::Up || keycode == event::KeyCode::Down) {
+        } else if (keycode == KeyCode::Up || keycode == KeyCode::Down) {
             self.p2.paddle.velocity.y = 0.0;
         }
     }
