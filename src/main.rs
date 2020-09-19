@@ -6,9 +6,10 @@
 extern crate ggez;
 extern crate rand;
 
-use ggez::{graphics, event, conf, nalgebra::Point2, Context, ContextBuilder, GameResult};
-use ggez::graphics::{MeshBuilder, DrawParam, DrawMode, Text};
-use ggez::event::{KeyCode, KeyMods, EventsLoop};
+use ggez::{nalgebra::Point2, Context, ContextBuilder, GameResult};
+use ggez::graphics::{self, MeshBuilder, DrawParam, DrawMode, Text, TextFragment, Font};
+use ggez::event::{self, KeyCode, KeyMods, EventsLoop};
+use ggez::conf::{self, WindowMode, WindowSetup};
 use rand::Rng;
 
 struct Object {
@@ -23,8 +24,9 @@ struct Player {
 
 struct Game {
     WINDOW_SIZE: Point2<f32>,
-    paddle_size: Point2<f32>,
-    line_width: f32,
+    PADDLE_SIZE: Point2<f32>,
+    LINE_WIDTH: f32,
+    font: Font,
     ball: Object,
     p1: Player,
     p2: Player
@@ -33,14 +35,15 @@ struct Game {
 impl Game {
     pub fn new(context: &Context) -> Game {
         let (x, y) = graphics::size(context);
-        let paddle_size = Point2::new(x * 0.025, y * 0.1);
-        let line_width = x * 0.01; 
+        let PADDLE_SIZE = Point2::new(x * 0.025, y * 0.1);
+        let LINE_WIDTH = x * 0.01; 
 
         return Game {
             WINDOW_SIZE: Point2::new(x, y),
-            paddle_size: paddle_size,
-            line_width: line_width,
+            PADDLE_SIZE: PADDLE_SIZE,
+            LINE_WIDTH: LINE_WIDTH,
 
+            font: Font::default(),
 
             ball: Object {
                 position: Point2::new(0.0, 0.0),
@@ -50,7 +53,7 @@ impl Game {
             p1: Player {
                 score: 0,
                 paddle: Object {
-                    position: Point2::new(line_width, (y / 2.0) - paddle_size.y),
+                    position: Point2::new(LINE_WIDTH, (y / 2.0) - PADDLE_SIZE.y),
                     velocity: Point2::new(0.0, 0.0)  
                 }
             },
@@ -58,7 +61,7 @@ impl Game {
             p2: Player {
                 score: 0,
                 paddle: Object {
-                    position: Point2::new(x - ((paddle_size.x * 2.0) + (line_width / 2.0)), (y / 2.0) - paddle_size.y),
+                    position: Point2::new(x - ((PADDLE_SIZE.x * 2.0) + (LINE_WIDTH / 2.0)), (y / 2.0) - PADDLE_SIZE.y),
                     velocity: Point2::new(0.0, 0.0)   
                 }
             }
@@ -71,6 +74,9 @@ impl Game {
         } else {
             self.create_ball(true, context);
         }
+        
+        self.font = Font::new(context, "/Sansation_Regular.ttf")
+            .expect("Loaded font");
 
         match event::run(context, events_loop, self) {
             Ok(_) => println!("Success!"),
@@ -79,10 +85,10 @@ impl Game {
     }
 
     fn create_ball(&mut self, right_side: bool, context: &mut Context) {
-        let (mut horizontal, mut vertical) = (self.random(3.0, 6.0), self.random(2.0, 4.0));
-        
         self.ball.position = Point2::new(self.WINDOW_SIZE.x / 2.0, self.WINDOW_SIZE.y / 2.0);
-        
+
+        let (mut horizontal, mut vertical) = (self.random(3.0, 6.0), self.random(2.0, 4.0));
+
         if (right_side) {
             horizontal = -horizontal;
         }
@@ -101,6 +107,10 @@ impl Game {
 
     fn add_points(&mut self, point1: Point2<f32>, point2: Point2<f32>) -> Point2<f32> {
         return Point2::new(point1.x + point2.x, point1.y + point2.y);
+    }
+
+    fn draw_text(&mut self, context: &mut Context, text: std::string::String, position: Point2<f32>) -> () {
+        graphics::draw(context, &Text::new(TextFragment::new(text.to_string()).font(self.font)), DrawParam::default().dest(position));
     }
 }
 
@@ -122,25 +132,25 @@ impl event::EventHandler for Game {
 
         let BALL_RADIUS = self.WINDOW_SIZE.x * 0.025;
 
-        let MIDDLE_X = (self.WINDOW_SIZE.x / 2.0) - self.line_width;
-        let END_X = self.WINDOW_SIZE.x - self.line_width * 2.0;
+        let MIDDLE_X = (self.WINDOW_SIZE.x / 2.0) - self.LINE_WIDTH;
+        let END_X = self.WINDOW_SIZE.x - self.LINE_WIDTH * 2.0;
 
         let backgroundMesh = MeshBuilder::new()
-            .line(&[ Point2::new(MIDDLE_X, 0.0), Point2::new(MIDDLE_X, self.WINDOW_SIZE.y) ], self.line_width, LINE_COLOR)? // Middle
-            .line(&[ Point2::new(0.0, 0.0), Point2::new(0.0, self.WINDOW_SIZE.y) ], self.line_width, LINE_COLOR)? // Left
-            .line(&[ Point2::new(END_X, 0.0), Point2::new(END_X, self.WINDOW_SIZE.y) ], self.line_width, LINE_COLOR)? // Right
-            .circle(FILL_MODE, Point2::new(self.WINDOW_SIZE.x / 2.0 - self.line_width, self.WINDOW_SIZE.y / 2.0), self.WINDOW_SIZE.x * 0.05, 0.05, LINE_COLOR) // Middle circle
+            .line(&[ Point2::new(MIDDLE_X, 0.0), Point2::new(MIDDLE_X, self.WINDOW_SIZE.y) ], self.LINE_WIDTH, LINE_COLOR)? // Middle
+            .line(&[ Point2::new(0.0, 0.0), Point2::new(0.0, self.WINDOW_SIZE.y) ], self.LINE_WIDTH, LINE_COLOR)? // Left
+            .line(&[ Point2::new(END_X, 0.0), Point2::new(END_X, self.WINDOW_SIZE.y) ], self.LINE_WIDTH, LINE_COLOR)? // Right
+            .circle(FILL_MODE, Point2::new(self.WINDOW_SIZE.x / 2.0 - self.LINE_WIDTH, self.WINDOW_SIZE.y / 2.0), self.WINDOW_SIZE.x * 0.05, 0.05, LINE_COLOR) // Middle circle
             .build(context)?;
 
         graphics::draw(context, &backgroundMesh, DEFAULT_PARAMS)?;
 
         let (paddle1new, paddle2new) = (self.p1.paddle.position.y + self.p1.paddle.velocity.y, self.p2.paddle.position.y + self.p2.paddle.velocity.y);
 
-        if (paddle1new > 0.0 && self.WINDOW_SIZE.y > (paddle1new + self.paddle_size.y)) {
+        if (paddle1new > 0.0 && self.WINDOW_SIZE.y > (paddle1new + self.PADDLE_SIZE.y)) {
             self.p1.paddle.position = self.add_points(self.p1.paddle.position, self.p1.paddle.velocity);
         }
 
-        if (paddle2new > 0.0 && self.WINDOW_SIZE.y > (paddle2new + self.paddle_size.y)) {
+        if (paddle2new > 0.0 && self.WINDOW_SIZE.y > (paddle2new + self.PADDLE_SIZE.y)) {
             self.p2.paddle.position = self.add_points(self.p2.paddle.position, self.p2.paddle.velocity);
         }
 
@@ -148,8 +158,8 @@ impl event::EventHandler for Game {
 
         let mainMesh = MeshBuilder::new()
             .circle(FILL_MODE, self.ball.position, BALL_RADIUS, 0.05, graphics::Color::new(255.0, 0.0, 0.0, 1.0)) // Ball
-            .rectangle(FILL_MODE, graphics::Rect::new(self.p1.paddle.position.x, self.p1.paddle.position.y, self.paddle_size.x, self.paddle_size.y), PADDLE_COLOR) // p1 paddle
-            .rectangle(FILL_MODE, graphics::Rect::new(self.p2.paddle.position.x, self.p2.paddle.position.y, self.paddle_size.x, self.paddle_size.y), PADDLE_COLOR) // p2 paddle
+            .rectangle(FILL_MODE, graphics::Rect::new(self.p1.paddle.position.x, self.p1.paddle.position.y, self.PADDLE_SIZE.x, self.PADDLE_SIZE.y), PADDLE_COLOR) // p1 paddle
+            .rectangle(FILL_MODE, graphics::Rect::new(self.p2.paddle.position.x, self.p2.paddle.position.y, self.PADDLE_SIZE.x, self.PADDLE_SIZE.y), PADDLE_COLOR) // p2 paddle
             .build(context)?;
 
         graphics::draw(context, &mainMesh, DEFAULT_PARAMS)?;
@@ -160,8 +170,8 @@ impl event::EventHandler for Game {
         }
 
         // p1 paddle collision
-        if (self.p1.paddle.position.x >= (self.ball.position.x - BALL_RADIUS - self.paddle_size.x)) {
-            if (self.ball.position.y >= self.p1.paddle.position.y && (self.p1.paddle.position.y + self.paddle_size.y) >= self.ball.position.y) {
+        if (self.p1.paddle.position.x >= (self.ball.position.x - BALL_RADIUS - self.PADDLE_SIZE.x)) {
+            if (self.ball.position.y >= self.p1.paddle.position.y && (self.p1.paddle.position.y + self.PADDLE_SIZE.y) >= self.ball.position.y) {
                 self.ball.velocity.x = -(self.ball.velocity.x * 1.1);
                 // self.ball.velocity.y = -self.ball.velocity.y;
 
@@ -173,7 +183,7 @@ impl event::EventHandler for Game {
 
         // p2 paddle collision
         if ((self.ball.position.x + BALL_RADIUS) >= self.p2.paddle.position.x) {
-            if (self.ball.position.y >= self.p2.paddle.position.y && (self.p2.paddle.position.y + self.paddle_size.y) >= self.ball.position.y) {
+            if (self.ball.position.y >= self.p2.paddle.position.y && (self.p2.paddle.position.y + self.PADDLE_SIZE.y) >= self.ball.position.y) {
                 self.ball.velocity.x = -(self.ball.velocity.x * 1.1);
                 // self.ball.velocity.y = -self.ball.velocity.y;
 
@@ -183,16 +193,13 @@ impl event::EventHandler for Game {
             }
         }
 
-        let score1 = Text::new(format!("Score: {}", self.p1.score));
-        let score2 = Text::new(format!("Score: {}", self.p2.score));
-
-        graphics::draw(context, &score1, DrawParam::default().dest(Point2::new(self.WINDOW_SIZE.x * 0.1, self.WINDOW_SIZE.y * 0.1)))?;
-        graphics::draw(context, &score2, DrawParam::default().dest(Point2::new(self.WINDOW_SIZE.x * 0.8, self.WINDOW_SIZE.y * 0.1)))?;
+        self.draw_text(context, format!("Score: {}", self.p1.score), Point2::new(self.WINDOW_SIZE.x * 0.2, self.WINDOW_SIZE.y * 0.1));
+        self.draw_text(context, format!("Score: {}", self.p2.score), Point2::new(self.WINDOW_SIZE.x * 0.7, self.WINDOW_SIZE.y * 0.1));
 
         return graphics::present(context);
     }
 
-    fn key_down_event(&mut self, context: &mut Context, keycode: event::KeyCode, mods: KeyMods, repeat: bool) {
+    fn key_down_event(&mut self, context: &mut Context, keycode: KeyCode, mods: KeyMods, repeat: bool) {
         if (keycode == KeyCode::W) {
             self.p1.paddle.velocity.y = -8.0;
 
@@ -218,7 +225,7 @@ impl event::EventHandler for Game {
 }
 
 fn main() {
-    let mode = conf::WindowMode {
+    let mode = WindowMode {
         width: 800.0,
         height: 600.0,
         maximized: true,
@@ -231,11 +238,11 @@ fn main() {
         resizable: false,
     }; 
 
-    let setup = conf::WindowSetup {
+    let setup = WindowSetup {
         title: "Ping Pong".to_owned(),
         samples: conf::NumSamples::Zero,
         vsync: true,
-        icon: "".to_owned(),
+        icon: "/icon.png".to_owned(),
         srgb: true
     };
 
@@ -245,7 +252,5 @@ fn main() {
         .build()
         .expect("ggez couldn't create context");
 
-    let mut my_game = Game::new(&context);
-
-    my_game.start(&mut context, &mut events_loop);
+    Game::new(&context).start(&mut context, &mut events_loop);
 }
